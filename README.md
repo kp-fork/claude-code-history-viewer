@@ -117,7 +117,17 @@ Antigravity note: the viewer resolves the Antigravity root as `~/.gemini/antigra
 |---------|-------|
 | **Antigravity** | Loaded through the standard provider pipeline. Sessions come from the token monitor cache and participate in project/session views, token stats, analytics, and global search without a separate UI mode. |
 
-### New in v1.13.0
+### New in v1.14.0
+
+| Feature | Description |
+|---------|-------------|
+| **CodeBuddy Code Provider** | Added CodeBuddy Code — browse its conversation history alongside your other AI coding assistants |
+| **WebUI Account Login** | `--serve` mode gains optional account authentication (Argon2id + server-side sessions + CSRF), a read-only mode, and base-path support for reverse-proxy hosting |
+| **Persistent Message Filters** | Role and content-type filters now persist across session switches and app restarts |
+| **Subagent Session Stability** | Fixed multi-subagent click mapping and an occasional crash when opening large subagent sessions |
+| **Linux IME Input** | Fixed ibus/fcitx input (Korean, Chinese, Japanese) in the search box on Linux |
+
+### v1.13.0
 
 | Feature | Description |
 |---------|-------------|
@@ -137,17 +147,7 @@ Antigravity note: the viewer resolves the Antigravity root as `~/.gemini/antigra
 | **Context Menu Polish** | Right-click menus rendered in portal for cursor-precise anchoring; clamp to panel bounds; close on scroll |
 | **Custom Directory** | Custom Claude directory selection now applies instantly without restart |
 
-### v1.11.0
-
-| Feature | Description |
-|---------|-------------|
-| **Auto-refresh Sessions** | Session list auto-refreshes on file changes; auto-scroll to bottom on new messages |
-| **Project Panel Search** | Search box plus horizontal scrollbar for long project names |
-| **Session Right-click Menu** | Copy session ID, resume command, file path; delete session; show JSONL file; native rename with search integration |
-| **Sub-agent Conversation History** | View sub-agent (sidechain) conversation history |
-| **Custom Claude Config Directories** | Support directories outside `~/.claude` |
-
-> Older releases: see [CHANGELOG.md](./CHANGELOG.md) for v1.10.0 and earlier.
+> Older releases: see [CHANGELOG.md](./CHANGELOG.md) for v1.11.0 and earlier.
 
 ### More
 
