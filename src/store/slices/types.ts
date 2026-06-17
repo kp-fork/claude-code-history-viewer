@@ -182,6 +182,7 @@ export interface AppStoreState {
   // Watcher state
   watcherEnabled: boolean;
   lastUpdateTime: Record<string, number>;
+  activeSessionNearBottom: boolean;
 
   // Navigator state
   isNavigatorOpen: boolean;
@@ -197,6 +198,10 @@ export interface AppStoreState {
   // Session picker state (used by CLI `--session-title` hint with multi-match)
   sessionPickerCandidates: import('./sessionPickerSlice').SessionPickerCandidate[] | null;
   sessionPickerHintValue: string | null;
+
+  // WebUI server state
+  isServerReadOnly: boolean;
+  isServerConfigLoaded: boolean;
 }
 
 export interface AppStoreActions {
@@ -346,6 +351,7 @@ export interface AppStoreActions {
   markProjectUpdated: (projectPath: string) => void;
   triggerProjectRefresh: (projectPath: string) => Promise<void>;
   triggerSessionRefresh: (projectPath: string, sessionPath: string) => Promise<void>;
+  setActiveSessionNearBottom: (nearBottom: boolean) => void;
 
   // Navigator actions
   toggleNavigator: () => void;
@@ -383,6 +389,9 @@ export interface AppStoreActions {
     hintValue: string,
   ) => void;
   closeSessionPicker: () => void;
+
+  // WebUI server actions
+  loadServerConfig: () => Promise<void>;
 }
 
 export type FullAppStore = AppStoreState & AppStoreActions;

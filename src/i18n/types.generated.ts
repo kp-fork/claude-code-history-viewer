@@ -5,8 +5,8 @@
  * 직접 수정하지 마세요.
  *
  * 생성 명령: pnpm run generate:i18n-types
- * 생성 시간: 2026-05-25T07:37:00.105Z
- * 총 키 개수: 1781
+ * 생성 시간: 2026-06-17T09:57:18.950Z
+ * 총 키 개수: 1786
  * Namespace 수: 11
  */
 
@@ -40,7 +40,7 @@ export type I18nNamespace =
   | 'recentEdits';
 
 /**
- * common namespace의 번역 키 (161개)
+ * common namespace의 번역 키 (162개)
  * 파일: locales/{lang}/common.json
  */
 export type CommonKeys =
@@ -111,6 +111,7 @@ export type CommonKeys =
   | 'common.provider.antigravity'
   | 'common.provider.claude'
   | 'common.provider.cline'
+  | 'common.provider.codebuddy'
   | 'common.provider.codex'
   | 'common.provider.cursor'
   | 'common.provider.detectError'
@@ -393,7 +394,7 @@ export type AnalyticsKeys =
   | 'analytics.weeklyActivity';
 
 /**
- * session namespace의 번역 키 (205개)
+ * session namespace의 번역 키 (206개)
  * 파일: locales/{lang}/session.json
  */
 export type SessionKeys =
@@ -594,6 +595,7 @@ export type SessionKeys =
   | 'session.scanning'
   | 'session.select'
   | 'session.selectDescription'
+  | 'session.selectError'
   | 'session.showJsonlFile'
   | 'session.summaryNotFound'
   | 'session.syncError'
@@ -1358,7 +1360,7 @@ export type MessageKeys =
   | 'navigator.userOnly';
 
 /**
- * renderers namespace의 번역 키 (380개)
+ * renderers namespace의 번역 키 (383개)
  * 파일: locales/{lang}/renderers.json
  */
 export type RenderersKeys =
@@ -1380,6 +1382,9 @@ export type RenderersKeys =
   | 'advancedTextDiff.same'
   | 'advancedTextDiff.textChanges'
   | 'advancedTextDiff.unchanged'
+  | 'advisorToolResultRenderer.empty'
+  | 'advisorToolResultRenderer.error'
+  | 'advisorToolResultRenderer.title'
   | 'agentProgressGroup.agent'
   | 'agentProgressGroup.steps'
   | 'agentTaskGroup.agent'
@@ -1908,6 +1913,9 @@ export type TranslationKey =
   | 'advancedTextDiff.same'
   | 'advancedTextDiff.textChanges'
   | 'advancedTextDiff.unchanged'
+  | 'advisorToolResultRenderer.empty'
+  | 'advisorToolResultRenderer.error'
+  | 'advisorToolResultRenderer.title'
   | 'agentProgressGroup.agent'
   | 'agentProgressGroup.steps'
   | 'agentTaskGroup.agent'
@@ -2255,6 +2263,7 @@ export type TranslationKey =
   | 'common.provider.antigravity'
   | 'common.provider.claude'
   | 'common.provider.cline'
+  | 'common.provider.codebuddy'
   | 'common.provider.codex'
   | 'common.provider.cursor'
   | 'common.provider.detectError'
@@ -2904,6 +2913,7 @@ export type TranslationKey =
   | 'session.scanning'
   | 'session.select'
   | 'session.selectDescription'
+  | 'session.selectError'
   | 'session.showJsonlFile'
   | 'session.summaryNotFound'
   | 'session.syncError'
@@ -3677,6 +3687,7 @@ export type TranslationKey =
  */
 export type TranslationPrefix =
   | 'advancedTextDiff'
+  | 'advisorToolResultRenderer'
   | 'agentProgressGroup'
   | 'agentTaskGroup'
   | 'analytics'

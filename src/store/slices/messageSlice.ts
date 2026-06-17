@@ -102,6 +102,33 @@ export const INITIAL_PAGINATION = {
 // 빈 Map 재사용으로 useAppStore 구독자의 불필요한 re-render 방지
 const EMPTY_SUBAGENT_MAP: ReadonlyMap<string, string> = new Map();
 
+const areMessagesEquivalent = (
+  currentMessages: ClaudeMessage[],
+  nextMessages: ClaudeMessage[]
+) => {
+  if (currentMessages.length !== nextMessages.length) {
+    return false;
+  }
+
+  return currentMessages.every((message, index) => {
+    const nextMessage = nextMessages[index];
+    if (message === nextMessage) {
+      return true;
+    }
+
+    if (
+      !nextMessage ||
+      message.uuid !== nextMessage.uuid ||
+      message.type !== nextMessage.type ||
+      message.timestamp !== nextMessage.timestamp
+    ) {
+      return false;
+    }
+
+    return JSON.stringify(message) === JSON.stringify(nextMessage);
+  });
+};
+
 const initialMessageState: MessageSliceState = {
   messages: [],
   pagination: { ...INITIAL_PAGINATION },
@@ -173,9 +200,6 @@ export const createMessageSlice: StateCreator<
     ...initialMessageState,
 
   selectSession: async (session: ClaudeSession) => {
-    // Clear previous session's search index
-    clearSearchIndex();
-
     // Subagent intent를 await 전에 캡처하여 async race 차단.
     // - isSubagentNav: navigateToSubagent가 세팅한 1회성 플래그
     // - isInPlaceReload: filter toggle/refreshCurrentSession에서 같은 세션을 재로드하는 경우
@@ -188,17 +212,24 @@ export const createMessageSlice: StateCreator<
     const preserveStack = shouldTreatAsSubagent;
     isSubagentNav = false;
 
-    set({
-      messages: [],
-      pagination: { ...INITIAL_PAGINATION },
-      isLoadingMessages: true,
-      subagentSessions: [],
-      toolUseToSubagentMap: EMPTY_SUBAGENT_MAP as Map<string, string>,
-      ...(preserveStack ? {} : { parentSessionStack: [] }),
-    });
+    if (isInPlaceReload) {
+      if (get().messages.length === 0) {
+        set({ isLoadingMessages: true });
+      }
+    } else {
+      clearSearchIndex();
+      set({
+        messages: [],
+        pagination: { ...INITIAL_PAGINATION },
+        isLoadingMessages: true,
+        subagentSessions: [],
+        toolUseToSubagentMap: EMPTY_SUBAGENT_MAP as Map<string, string>,
+        ...(preserveStack ? {} : { parentSessionStack: [] }),
+      });
 
-    // Reset message filters on session switch
-    get().resetMessageFilter();
+      // Message filters intentionally persist across session switches (see
+      // filterSlice localStorage persistence); the toolbar reset button clears them.
+    }
 
     get().setSelectedSession(session);
     // Note: sessionSearch state reset is handled by searchSlice
@@ -241,6 +272,11 @@ export const createMessageSlice: StateCreator<
         console.log(
           `[Frontend] selectSession: ${filteredMessages.length}개 메시지 로드, ${duration.toFixed(1)}ms`
         );
+      }
+
+      if (isInPlaceReload && areMessagesEquivalent(get().messages, filteredMessages)) {
+        set({ isLoadingMessages: false });
+        return;
       }
 
       // Update state first to allow UI to render immediately
@@ -723,17 +759,30 @@ export const createMessageSlice: StateCreator<
       });
       // Guard: only update if still viewing the same session
       if (get().selectedSession?.file_path === sessionPath) {
-        // progress 메시지만 parentToolUseID와 agentId를 함께 보유 → 유일한 매핑 소스.
+        // toolUseId → subagent file_path 매핑. 두 소스 사용:
+        // 1) (신형) subagent.tool_use_id — agent-<id>.meta.json에서 읽은 Task tool_use id.
+        //    progress 메시지가 없는 다중 subagent 세션도 정확히 매핑 (#288).
+        // 2) (구형 back-compat) progress 메시지의 parentToolUseID ↔ agentId.
         // Map 값은 file_path(유일 식별자) — agent_id는 filename stem 기반이라 충돌 가능.
         // sourceMessages는 반드시 pre-filter(allMessages) — post-filter는 progress 제거됨.
         let map: Map<string, string> | ReadonlyMap<string, string> =
           EMPTY_SUBAGENT_MAP;
         if (subagents.length > 0) {
-          // O(1) lookup을 위해 agent_id → subagent 인덱스 선구축
-          const byAgentId = new Map(subagents.map((s) => [s.agent_id, s]));
           const built = new Map<string, string>();
+
+          // Primary (newer format): meta.json toolUseId, authoritative per file.
+          for (const sub of subagents) {
+            if (sub.tool_use_id) {
+              built.set(sub.tool_use_id, sub.file_path);
+            }
+          }
+
+          // Back-compat (older sessions without meta.json): progress messages.
+          // Only fill gaps not already mapped from meta.json (meta.json wins).
+          const byAgentId = new Map(subagents.map((s) => [s.agent_id, s]));
           for (const msg of sourceMessages) {
             if (msg.type !== "progress" || !msg.parentToolUseID) continue;
+            if (built.has(msg.parentToolUseID)) continue;
             const agentId = getAgentIdFromProgress(msg);
             if (!agentId) continue;
             const sub = byAgentId.get(agentId);
@@ -741,6 +790,7 @@ export const createMessageSlice: StateCreator<
               built.set(msg.parentToolUseID, sub.file_path);
             }
           }
+
           if (built.size > 0) map = built;
         }
         set({
