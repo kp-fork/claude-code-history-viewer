@@ -5,10 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.16.0] - 2026-06-21
 
 ### Added
-- **GitHub Copilot providers** — read-only browsing of GitHub Copilot CLI (`~/.copilot/session-state`), Copilot Desktop (differentiated via `workspace.yaml::client_name`), and VS Code Copilot Chat (`workspaceStorage/.../chatSessions`) histories, including WSL scanning and global search. (#350)
+- **GitHub Copilot providers** — read-only browsing of GitHub Copilot CLI (`~/.copilot/session-state/<id>/events.jsonl`, tool calls paired via `toolCallId`, resume via `copilot --resume=<id>`), Copilot Desktop (same on-disk format, differentiated via `workspace.yaml::client_name`), and VS Code Copilot Chat (`workspaceStorage/.../chatSessions/*.jsonl` replayed as a `kind:0` snapshot + `kind:1`/`kind:2` patch log; detects Code/Insiders/VSCodium). All three participate in WSL scanning and global search. (#415, rebase of #350)
+- **Headless session export** — new `--export <session-id|/abs/path.jsonl> [--format html|json] [--output <file>]` flag renders a report and exits without launching the GUI, for SSH/CI use. HTML output is a Rust port of the in-app exporter (markdown via `comrak`); session ids resolve under `~/.claude/projects` (unambiguous prefix accepted) and the file is written atomically. (#413)
+- **Most Used Skills / Most Used Subagents analytics** — tool-usage stats now break Claude `Skill` and `Agent` calls out into dedicated sections keyed by `input.skill` / `input.subagent_type`, at both project and global scope; sections are hidden when empty so non-Claude providers are unaffected. (#414)
+- **One-click Full Backup** — an Archive Manager "Full Backup" card copies every session from all Claude Code projects into per-project archives in a single action (with an "Include subagent transcripts" toggle), so history survives Claude Code's automatic cleanup. (#411)
+
+### Fixed
+- The font-size setting now applies to the whole app, not just the left panel: ~256 hardcoded `text-[Npx]` classes (and the `prose-xs` markdown variant) were made reactive to the setting, so the message viewer, analytics, session board, and settings dialogs scale together. Pixel-exact at the default scale. (#412)
+- Session delete now falls back to a permanent delete when the system trash is unavailable (Windows Recycle Bin disabled, network drives, locked files) instead of surfacing an opaque failure; the delete-confirmation copy reflects this across all 5 locales. (#410)
+- Codex session delete removes the orphaned `threads` row left in `state_5.sqlite` by a prior native rename — best-effort, never blocking the delete. (#409)
+
+### New Contributors
+- @theontho (#350 → #415)
 
 ## [1.15.0] - 2026-06-21
 
