@@ -14,7 +14,7 @@ export interface SessionItemProps {
    * Toggle this row's checkbox. Receives the mouse event so the caller can
    * read modifier keys (Shift = range, Cmd/Ctrl = individual toggle).
    */
-  onToggleSelect?: (e: React.MouseEvent) => void;
+  onToggleSelect?: (e: React.MouseEvent | React.KeyboardEvent) => void;
   /**
    * Start/extend a selection from normal mode via a modifier click
    * (Cmd/Ctrl+click or Shift+click). Enters selection mode.

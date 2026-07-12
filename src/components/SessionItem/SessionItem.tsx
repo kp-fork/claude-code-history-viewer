@@ -108,8 +108,18 @@ export const SessionItem: React.FC<SessionItemProps> = ({
             role="checkbox"
             aria-checked={isChecked}
             aria-label={editing.displayName || t("session.summaryNotFound", "No summary")}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              // Keyboard parity with the row click: Space/Enter toggles.
+              if (e.key === " " || e.key === "Enter") {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleSelect?.(e);
+              }
+            }}
             className={cn(
               "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
               isChecked
                 ? "border-accent bg-accent text-accent-foreground"
                 : "border-border bg-transparent"

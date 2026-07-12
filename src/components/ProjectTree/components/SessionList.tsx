@@ -38,8 +38,8 @@ interface SessionRowData {
   formatTimeAgo: (date: string) => string;
   isSelectionMode: boolean;
   selectedIds: Set<string>;
-  onSessionCheck: (session: ClaudeSession, e: React.MouseEvent) => void;
-  onSessionModifierSelect: (session: ClaudeSession, e: React.MouseEvent) => void;
+  onSessionCheck: (session: ClaudeSession, e: React.MouseEvent | React.KeyboardEvent | React.KeyboardEvent) => void;
+  onSessionModifierSelect: (session: ClaudeSession, e: React.MouseEvent | React.KeyboardEvent) => void;
 }
 
 interface SessionRowProps {
@@ -297,7 +297,7 @@ export const SessionList: React.FC<SessionListProps> = ({
     setSessionSortOrder(sessionSortOrder === 'newest' ? 'oldest' : 'newest');
 
   const handleSessionCheck = useCallback(
-    (session: ClaudeSession, e: React.MouseEvent) => {
+    (session: ClaudeSession, e: React.MouseEvent | React.KeyboardEvent) => {
       handleSessionSelectionClick(session.session_id, orderedIds, {
         shift: e.shiftKey,
         cmdOrCtrl: e.metaKey || e.ctrlKey,
@@ -310,7 +310,7 @@ export const SessionList: React.FC<SessionListProps> = ({
   // enters selection mode and seeds the anchor from the currently open session
   // so the first Shift range / Cmd toggle extends from what's already open.
   const handleModifierSelect = useCallback(
-    (session: ClaudeSession, e: React.MouseEvent) => {
+    (session: ClaudeSession, e: React.MouseEvent | React.KeyboardEvent) => {
       const modifiers = {
         shift: e.shiftKey,
         cmdOrCtrl: e.metaKey || e.ctrlKey,
