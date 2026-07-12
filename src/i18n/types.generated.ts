@@ -5,8 +5,8 @@
  * 직접 수정하지 마세요.
  *
  * 생성 명령: pnpm run generate:i18n-types
- * 생성 시간: 2026-07-12T03:53:00.794Z
- * 총 키 개수: 1834
+ * 생성 시간: 2026-07-12T07:09:28.553Z
+ * 총 키 개수: 1849
  * Namespace 수: 11
  */
 
@@ -415,7 +415,7 @@ export type AnalyticsKeys =
   | 'analytics.weeklyActivity';
 
 /**
- * session namespace의 번역 키 (218개)
+ * session namespace의 번역 키 (233개)
  * 파일: locales/{lang}/session.json
  */
 export type SessionKeys =
@@ -629,6 +629,21 @@ export type SessionKeys =
   | 'session.select'
   | 'session.selectDescription'
   | 'session.selectError'
+  | 'session.selection.clear'
+  | 'session.selection.copiedIds'
+  | 'session.selection.copyIds'
+  | 'session.selection.count'
+  | 'session.selection.delete'
+  | 'session.selection.deleteConfirmButton'
+  | 'session.selection.deleteMore'
+  | 'session.selection.deletePartial'
+  | 'session.selection.deleteSkipped'
+  | 'session.selection.deleteSuccess'
+  | 'session.selection.deleteTargets'
+  | 'session.selection.deleteTitle'
+  | 'session.selection.enter'
+  | 'session.selection.exit'
+  | 'session.selection.selectAll'
   | 'session.showJsonlFile'
   | 'session.summaryNotFound'
   | 'session.syncError'
@@ -3009,6 +3024,21 @@ export type TranslationKey =
   | 'session.select'
   | 'session.selectDescription'
   | 'session.selectError'
+  | 'session.selection.clear'
+  | 'session.selection.copiedIds'
+  | 'session.selection.copyIds'
+  | 'session.selection.count'
+  | 'session.selection.delete'
+  | 'session.selection.deleteConfirmButton'
+  | 'session.selection.deleteMore'
+  | 'session.selection.deletePartial'
+  | 'session.selection.deleteSkipped'
+  | 'session.selection.deleteSuccess'
+  | 'session.selection.deleteTargets'
+  | 'session.selection.deleteTitle'
+  | 'session.selection.enter'
+  | 'session.selection.exit'
+  | 'session.selection.selectAll'
   | 'session.showJsonlFile'
   | 'session.summaryNotFound'
   | 'session.syncError'
