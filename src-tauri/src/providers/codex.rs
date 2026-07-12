@@ -323,7 +323,10 @@ pub(crate) fn parse_rollout_file(canonical_path: &Path) -> Result<Vec<ClaudeMess
     let ranges = find_line_ranges(&mmap);
 
     let mut messages = Vec::new();
-    let mut session_id = String::new();
+    // Filename-derived fallback id; the first session_meta overrides it
+    // (meta-less rollouts keep it — issue #451 follow-up).
+    let mut session_id = session_id_from_rollout_filename(canonical_path).unwrap_or_default();
+    let mut meta_seen = false;
     let mut current_model: Option<String> = None;
     let mut prev_input_tokens: u32 = 0;
     let mut prev_output_tokens: u32 = 0;
@@ -348,7 +351,8 @@ pub(crate) fn parse_rollout_file(canonical_path: &Path) -> Result<Vec<ClaudeMess
         match line_type {
             // First session_meta only — later ones are history replayed by
             // `codex fork` and must not re-tag messages with the source's id.
-            "session_meta" if session_id.is_empty() => {
+            "session_meta" if !meta_seen => {
+                meta_seen = true;
                 if let Some(payload) = val.get("payload") {
                     session_id = payload
                         .get("id")
@@ -697,6 +701,41 @@ fn parse_session_meta_cwd(line: &[u8]) -> Option<String> {
         .map(String::from)
 }
 
+/// cwd from a `turn_context` line, the fallback identity source for
+/// rollouts that carry no `session_meta` at all (issue #451 follow-up).
+fn parse_turn_context_cwd(line: &[u8]) -> Option<String> {
+    if !has_json_string_field_value(line, JSON_TYPE_KEY, b"turn_context") {
+        return None;
+    }
+
+    let mut buf = line.to_vec();
+    let val: Value = simd_json::from_slice(&mut buf).ok()?;
+    if val.get("type").and_then(|t| t.as_str()) != Some("turn_context") {
+        return None;
+    }
+
+    val.get("payload")?
+        .get("cwd")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+}
+
+/// Session id derived from the rollout filename
+/// (`rollout-<timestamp>-<uuid>.jsonl` → `<uuid>`); `None` when the stem
+/// doesn't end in a UUID.
+pub(crate) fn session_id_from_rollout_filename(path: &Path) -> Option<String> {
+    let stem = path.file_stem()?.to_str()?;
+    if stem.len() < 36 {
+        return None;
+    }
+    let tail = &stem[stem.len() - 36..];
+    let is_uuid = tail.bytes().enumerate().all(|(i, b)| match i {
+        8 | 13 | 18 | 23 => b == b'-',
+        _ => b.is_ascii_hexdigit(),
+    });
+    is_uuid.then(|| tail.to_string())
+}
+
 fn file_modified_rfc3339(path: &Path) -> String {
     fs::metadata(path)
         .ok()
@@ -721,15 +760,22 @@ pub(crate) fn extract_session_cwd(rollout_path: &Path) -> Result<Option<String>,
     let mmap = unsafe { Mmap::map(&file) }.map_err(|e| e.to_string())?;
 
     let mut cwd = None;
+    let mut turn_context_cwd = None;
     for_each_jsonl_line(&mmap, |line| {
         if let Some(found) = parse_session_meta_cwd(line) {
             cwd = Some(found);
             return false;
         }
+        // Fallback for rollouts without any session_meta: the LAST
+        // turn_context's cwd is where the session actually runs (a fork
+        // replays the source's turn contexts first) — issue #451 follow-up.
+        if let Some(found) = parse_turn_context_cwd(line) {
+            turn_context_cwd = Some(found);
+        }
         true
     });
 
-    Ok(cwd)
+    Ok(cwd.or(turn_context_cwd))
 }
 
 pub(crate) fn extract_project_scan_info(rollout_path: &Path) -> Result<ProjectScanInfo, String> {
@@ -811,7 +857,9 @@ pub(crate) fn extract_session_info(rollout_path: &Path) -> Result<SessionInfo, S
     let ranges = find_line_ranges(&mmap);
 
     let mut session_id = String::new();
+    let mut meta_seen = false;
     let mut cwd = None;
+    let mut turn_context_cwd = None;
     let mut model = None;
     let mut message_count = 0usize;
     let mut first_time = String::new();
@@ -835,7 +883,8 @@ pub(crate) fn extract_session_info(rollout_path: &Path) -> Result<SessionInfo, S
             // forked rollout contains the source's session_meta as history
             // after its own — taking the last one misfiles the session under
             // the source cwd (issue #451).
-            "session_meta" if session_id.is_empty() => {
+            "session_meta" if !meta_seen => {
+                meta_seen = true;
                 if let Some(payload) = val.get("payload") {
                     session_id = payload
                         .get("id")
@@ -848,12 +897,19 @@ pub(crate) fn extract_session_info(rollout_path: &Path) -> Result<SessionInfo, S
                         .map(String::from);
                 }
             }
-            "turn_context" if model.is_none() => {
+            "turn_context" => {
                 if let Some(payload) = val.get("payload") {
-                    model = payload
-                        .get("model")
-                        .and_then(|v| v.as_str())
-                        .map(String::from);
+                    if model.is_none() {
+                        model = payload
+                            .get("model")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
+                    }
+                    // Last turn_context wins — the fallback cwd for
+                    // rollouts without any session_meta (issue #451).
+                    if let Some(tc_cwd) = payload.get("cwd").and_then(|v| v.as_str()) {
+                        turn_context_cwd = Some(tc_cwd.to_string());
+                    }
                 }
             }
             "response_item" => {
@@ -914,6 +970,17 @@ pub(crate) fn extract_session_info(rollout_path: &Path) -> Result<SessionInfo, S
     } else {
         last_time.clone()
     };
+
+    // Meta-less rollout fallbacks (issue #451 follow-up): session id from
+    // the filename, cwd from the last turn_context.
+    if session_id.is_empty() {
+        if let Some(id) = session_id_from_rollout_filename(rollout_path) {
+            session_id = id;
+        }
+    }
+    if cwd.is_none() {
+        cwd = turn_context_cwd;
+    }
 
     Ok(SessionInfo {
         session_id,
@@ -3236,5 +3303,94 @@ mod tests {
                 .map(|m| m.session_id.clone())
                 .collect::<Vec<_>>()
         );
+    }
+
+    fn turn_context_line(timestamp: &str, cwd: &str) -> Value {
+        json!({
+            "timestamp": timestamp,
+            "type": "turn_context",
+            "payload": { "turn_id": "turn-1", "cwd": cwd, "model": "gpt-5" }
+        })
+    }
+
+    fn write_rollout_lines(dir: &Path, file_name: &str, lines: &[Value]) -> std::path::PathBuf {
+        let rollout_path = dir.join(file_name);
+        let body = lines
+            .iter()
+            .map(Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        fs::write(&rollout_path, format!("{body}\n")).expect("rollout fixture should be written");
+        rollout_path
+    }
+
+    #[test]
+    /// Newer Codex builds can leave rollouts with no `session_meta` line at
+    /// all (issue #451 follow-up). Identity must then come from fallbacks:
+    /// cwd from the LAST `turn_context` (a fork replays the source's turn
+    /// contexts first, so the last one is where the session actually runs)
+    /// and the session id from the rollout filename.
+    fn extract_session_info_falls_back_when_rollout_has_no_session_meta() {
+        let tmp = TempDir::new().expect("temp dir should be created");
+        let rollout_path = write_rollout_lines(
+            tmp.path(),
+            "rollout-2026-07-09T10-00-00-019cf000-aaaa-7000-8000-f986e7b4c56a.jsonl",
+            &[
+                turn_context_line("2026-07-09T10:00:00Z", "/tmp/proj-a"),
+                user_message_line("2026-07-09T10:00:01Z", "replayed from the source session"),
+                turn_context_line("2026-07-09T10:00:02Z", "/tmp/proj-b"),
+                user_message_line("2026-07-09T10:00:03Z", "continue in the fork's folder"),
+            ],
+        );
+
+        let info = extract_session_info(&rollout_path).expect("extract_session_info");
+        assert_eq!(info.cwd.as_deref(), Some("/tmp/proj-b"));
+        assert_eq!(info.session_id, "019cf000-aaaa-7000-8000-f986e7b4c56a");
+
+        let cwd = extract_session_cwd(&rollout_path).expect("extract_session_cwd");
+        assert_eq!(cwd.as_deref(), Some("/tmp/proj-b"));
+    }
+
+    #[test]
+    /// `session_meta`, when present, still wins over any `turn_context` fallback.
+    fn extract_session_info_prefers_session_meta_over_turn_context() {
+        let tmp = TempDir::new().expect("temp dir should be created");
+        let rollout_path = write_rollout_lines(
+            tmp.path(),
+            "rollout-2026-07-09T10-00-00-019cf000-bbbb-7000-8000-f986e7b4c56a.jsonl",
+            &[
+                session_meta_line_with("2026-07-09T10:00:00Z", "sess-meta", "/tmp/proj-meta"),
+                turn_context_line("2026-07-09T10:00:01Z", "/tmp/proj-turn"),
+                user_message_line("2026-07-09T10:00:02Z", "hello"),
+            ],
+        );
+
+        let info = extract_session_info(&rollout_path).expect("extract_session_info");
+        assert_eq!(info.cwd.as_deref(), Some("/tmp/proj-meta"));
+        assert_eq!(info.session_id, "sess-meta");
+        assert_eq!(
+            extract_session_cwd(&rollout_path).unwrap().as_deref(),
+            Some("/tmp/proj-meta")
+        );
+    }
+
+    #[test]
+    /// Messages in a meta-less rollout carry the filename-derived session id.
+    fn parse_rollout_file_uses_filename_session_id_without_meta() {
+        let tmp = TempDir::new().expect("temp dir should be created");
+        let rollout_path = write_rollout_lines(
+            tmp.path(),
+            "rollout-2026-07-09T10-00-00-019cf000-cccc-7000-8000-f986e7b4c56a.jsonl",
+            &[
+                turn_context_line("2026-07-09T10:00:00Z", "/tmp/proj-b"),
+                user_message_line("2026-07-09T10:00:01Z", "no meta anywhere"),
+            ],
+        );
+
+        let messages = parse_rollout_file(&rollout_path).expect("parse_rollout_file");
+        assert!(!messages.is_empty());
+        assert!(messages
+            .iter()
+            .all(|m| m.session_id == "019cf000-cccc-7000-8000-f986e7b4c56a"));
     }
 }
