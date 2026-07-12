@@ -209,8 +209,14 @@ pub fn load_messages_from_base_path(
         if role == "system" {
             continue;
         }
-        if let Some(message) = convert_message(&value, role, &session_id, &timestamp, &mut counter)
-        {
+        if let Some(message) = convert_message(
+            &value,
+            role,
+            &session_id,
+            &timestamp,
+            &mut counter,
+            &session_dir,
+        ) {
             messages.push(message);
         }
     }
@@ -371,6 +377,7 @@ fn convert_message(
     session_id: &str,
     timestamp: &str,
     counter: &mut u64,
+    session_dir: &Path,
 ) -> Option<ClaudeMessage> {
     *counter += 1;
     let uuid = value
@@ -381,18 +388,27 @@ fn convert_message(
         .unwrap_or_else(|| format!("{session_id}-{counter}"));
 
     match role {
-        "user" => Some(build_provider_message(
-            PROVIDER_ID,
-            uuid,
-            session_id,
-            timestamp.to_string(),
-            "user",
-            Some("user"),
-            Some(content_to_blocks(value.get("content"))),
-            None,
-        )),
+        "user" => {
+            let mut blocks = content_to_blocks(value.get("content"));
+            if let Some(arr) = blocks.as_array_mut() {
+                arr.extend(image_blocks(value, session_dir));
+            }
+            Some(build_provider_message(
+                PROVIDER_ID,
+                uuid,
+                session_id,
+                timestamp.to_string(),
+                "user",
+                Some("user"),
+                Some(blocks),
+                None,
+            ))
+        }
         "assistant" => {
             let mut blocks = content_to_blocks(value.get("content"));
+            if let Some(arr) = blocks.as_array_mut() {
+                arr.extend(image_blocks(value, session_dir));
+            }
             if let Some(reasoning) = value
                 .get("reasoning_content")
                 .and_then(Value::as_str)
@@ -442,6 +458,91 @@ fn convert_message(
         )),
         _ => None,
     }
+}
+
+/// Convert a Vibe message's `images` attachments into viewer image blocks.
+///
+/// Upstream persists pasted/attached images either inline
+/// (`source: {kind: "inline", data: <base64>}`) or as a snapshot file inside
+/// the session directory (`source: {kind: "file", path}`); older transcripts
+/// use a flat `{data}` / `{path}` shape. File sources are read from disk only
+/// when they resolve inside the session directory — everything else is
+/// skipped rather than erroring the message.
+fn image_blocks(value: &Value, session_dir: &Path) -> Vec<Value> {
+    let Some(images) = value.get("images").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+
+    let mut blocks = Vec::new();
+    for image in images {
+        let mime_type = image
+            .get("mime_type")
+            .and_then(Value::as_str)
+            .unwrap_or("image/png");
+        let source = image.get("source");
+
+        let inline_data = source
+            .filter(|s| s.get("kind").and_then(Value::as_str) == Some("inline"))
+            .and_then(|s| s.get("data"))
+            .or_else(|| image.get("data"))
+            .and_then(Value::as_str);
+        let file_path = source
+            .filter(|s| s.get("kind").and_then(Value::as_str) == Some("file"))
+            .and_then(|s| s.get("path"))
+            .or_else(|| image.get("path"))
+            .and_then(Value::as_str);
+
+        let data = if let Some(data) = inline_data {
+            Some(data.to_string())
+        } else {
+            file_path.and_then(|path| read_session_image(session_dir, Path::new(path)))
+        };
+
+        if let Some(data) = data {
+            blocks.push(json!({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": mime_type,
+                    "data": data
+                }
+            }));
+        }
+    }
+    blocks
+}
+
+/// Sanity cap for snapshot files read back into memory; upstream rejects
+/// anything larger at capture time.
+const MAX_IMAGE_SNAPSHOT_BYTES: u64 = 10 * 1024 * 1024;
+
+/// Read an image snapshot, base64-encoded, only when the (possibly relative)
+/// path resolves inside the session directory and is not a symlink.
+fn read_session_image(session_dir: &Path, path: &Path) -> Option<String> {
+    use base64::Engine as _;
+
+    let canonical_dir = session_dir.canonicalize().ok()?;
+    let candidate = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        canonical_dir.join(path)
+    };
+    if fs::symlink_metadata(&candidate)
+        .ok()?
+        .file_type()
+        .is_symlink()
+    {
+        return None;
+    }
+    let canonical = candidate.canonicalize().ok()?;
+    if !canonical.starts_with(&canonical_dir) {
+        return None;
+    }
+    if fs::metadata(&canonical).ok()?.len() > MAX_IMAGE_SNAPSHOT_BYTES {
+        return None;
+    }
+    let bytes = fs::read(&canonical).ok()?;
+    Some(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
 fn content_to_blocks(content: Option<&Value>) -> Value {
@@ -759,5 +860,59 @@ mod tests {
 
         // The real session still loads fine alongside the rejected link.
         assert!(load_messages_from_base_path(&base, &session_dir).is_ok());
+    }
+
+    #[test]
+    /// Pasted/attached images render: inline sources decode from the record,
+    /// file sources are read from the session directory, and paths escaping
+    /// the session dir are skipped (issue #438 follow-up).
+    fn load_messages_renders_image_attachments() {
+        use base64::Engine as _;
+
+        let temp = TempDir::new().expect("temp dir");
+        let (_cwd, session_dir) = write_fixture(temp.path());
+        let base = temp.path().to_string_lossy().to_string();
+
+        let png_bytes: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        fs::write(Path::new(&session_dir).join("img_1.png"), png_bytes).expect("write snapshot");
+
+        let inline_b64 = base64::engine::general_purpose::STANDARD.encode(b"inline-bytes");
+        let record = json!({
+            "role": "user",
+            "content": "look at these",
+            "message_id": "msg-img",
+            "images": [
+                { "source": { "kind": "inline", "data": inline_b64 }, "alias": "a", "mime_type": "image/jpeg" },
+                { "source": { "kind": "file", "path": "img_1.png" }, "alias": "b", "mime_type": "image/png" },
+                { "source": { "kind": "file", "path": "../outside.png" }, "alias": "c", "mime_type": "image/png" },
+                { "path": "img_1.png", "alias": "legacy-flat", "mime_type": "image/png" }
+            ]
+        });
+        let messages_path = Path::new(&session_dir).join(MESSAGES_FILE);
+        let mut content = fs::read_to_string(&messages_path).expect("read messages");
+        content.push('\n');
+        content.push_str(&record.to_string());
+        content.push('\n');
+        fs::write(&messages_path, content).expect("write messages");
+
+        let messages = load_messages_from_base_path(&base, &session_dir).expect("load messages");
+        let with_images = messages
+            .iter()
+            .find(|m| m.uuid == "msg-img")
+            .expect("image message present");
+        let blocks = with_images.content.as_ref().expect("content blocks");
+        let image_blocks: Vec<_> = blocks
+            .as_array()
+            .expect("array")
+            .iter()
+            .filter(|b| b["type"] == "image")
+            .collect();
+
+        // inline + in-dir file + legacy flat = 3; the escaping path is skipped.
+        assert_eq!(image_blocks.len(), 3);
+        assert_eq!(image_blocks[0]["source"]["media_type"], "image/jpeg");
+        assert_eq!(image_blocks[0]["source"]["data"], json!(inline_b64));
+        let expected_png = base64::engine::general_purpose::STANDARD.encode(png_bytes);
+        assert_eq!(image_blocks[1]["source"]["data"], json!(expected_png));
     }
 }
