@@ -29,6 +29,7 @@ pub mod pi;
 pub mod q_conversation;
 pub mod qwen;
 pub mod trae;
+pub mod vibe;
 pub mod vscode;
 pub mod zed;
 
@@ -80,6 +81,8 @@ pub enum ProviderId {
     Zed,
     /// Trae IDE chat (reverse-engineered icube JSON in per-workspace `state.vscdb`).
     Trae,
+    /// Mistral Vibe CLI (`~/.vibe/logs/session/<session>/`).
+    Vibe,
 }
 
 impl ProviderId {
@@ -112,6 +115,7 @@ impl ProviderId {
             Self::Antigravity => "antigravity",
             Self::Zed => "zed",
             Self::Trae => "trae",
+            Self::Vibe => "vibe",
         }
     }
 
@@ -144,6 +148,7 @@ impl ProviderId {
             "antigravity" => Some(Self::Antigravity),
             "zed" => Some(Self::Zed),
             "trae" => Some(Self::Trae),
+            "vibe" => Some(Self::Vibe),
             _ => None,
         }
     }
@@ -177,6 +182,7 @@ impl ProviderId {
             Self::Antigravity => "Antigravity",
             Self::Zed => "Zed",
             Self::Trae => "Trae",
+            Self::Vibe => "Mistral Vibe",
         }
     }
 }
@@ -273,6 +279,9 @@ pub fn detect_providers() -> Vec<ProviderInfo> {
         providers.push(info);
     }
     if let Some(info) = copilot::detect() {
+        providers.push(info);
+    }
+    if let Some(info) = vibe::detect() {
         providers.push(info);
     }
 

@@ -1,6 +1,6 @@
 import type { ProviderId } from "../types";
 
-export const PROVIDER_IDS: ProviderId[] = ["aider", "amazonq", "antigravity", "claude", "cline", "codebuddy", "codex", "continue", "copilot", "crush", "cursor", "cursor-agent", "forgecode", "gemini", "goose", "kimi", "kiro", "llm", "ompi", "opencode", "openhands", "openinterpreter", "pearai", "pi", "qwen", "trae", "zed"];
+export const PROVIDER_IDS: ProviderId[] = ["aider", "amazonq", "antigravity", "claude", "cline", "codebuddy", "codex", "continue", "copilot", "crush", "cursor", "cursor-agent", "forgecode", "gemini", "goose", "kimi", "kiro", "llm", "ompi", "opencode", "openhands", "openinterpreter", "pearai", "pi", "qwen", "trae", "vibe", "zed"];
 export const DEFAULT_PROVIDER_ID: ProviderId = "claude";
 
 const PROVIDER_TRANSLATIONS: Record<
@@ -33,6 +33,7 @@ const PROVIDER_TRANSLATIONS: Record<
   pi: { key: "common.provider.pi", fallback: "Pi" },
   qwen: { key: "common.provider.qwen", fallback: "Qwen Code" },
   trae: { key: "common.provider.trae", fallback: "Trae" },
+  vibe: { key: "common.provider.vibe", fallback: "Mistral Vibe" },
   zed: { key: "common.provider.zed", fallback: "Zed" },
 };
 
@@ -232,6 +233,13 @@ const PROVIDER_SESSION_CAPABILITIES: Record<ProviderId, ProviderSessionCapabilit
     supportsSessionDeletion: false,
     supportsArchiveCreation: false,
   },
+  vibe: {
+    supportsConversationBreakdown: false,
+    supportsNativeRename: false,
+    supportsResumeCommand: true,
+    supportsSessionDeletion: false,
+    supportsArchiveCreation: false,
+  },
   zed: {
     supportsConversationBreakdown: false,
     supportsNativeRename: false,
@@ -280,6 +288,7 @@ export function getProviderId(provider?: ProviderId | string): ProviderId {
     case "pearai":
     case "qwen":
     case "trae":
+    case "vibe":
     case "zed":
     case "claude":
       return provider;
@@ -381,6 +390,9 @@ export function getResumeCommand(
     case "kimi":
       resume = `kimi -r ${sessionId}`;
       break;
+    case "vibe":
+      resume = `vibe --resume ${sessionId}`;
+      break;
     default:
       resume = null;
   }
@@ -441,6 +453,7 @@ export const PROVIDER_BADGE_STYLES: Record<ProviderId, string> = {
   pi: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
   qwen: "bg-violet-600/15 text-violet-700 dark:text-violet-300",
   trae: "bg-blue-600/15 text-blue-700 dark:text-blue-300",
+  vibe: "bg-orange-600/15 text-orange-700 dark:text-orange-300",
   zed: "bg-neutral-500/15 text-neutral-600 dark:text-neutral-400",
   aider: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
   amazonq: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400",

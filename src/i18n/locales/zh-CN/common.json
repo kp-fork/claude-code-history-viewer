@@ -143,6 +143,7 @@
   "common.provider.pearai": "PearAI",
   "common.provider.qwen": "Qwen Code",
   "common.provider.trae": "Trae",
+  "common.provider.vibe": "Mistral Vibe",
   "common.provider.zed": "Zed",
   "common.provider.zcode": "ZCode",
   "common.view": "查看",

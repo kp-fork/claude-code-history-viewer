@@ -65,6 +65,7 @@ describe("providers utils", () => {
       "pi",
       "qwen",
       "trae",
+      "vibe",
       "zed",
     ]);
   });
@@ -98,6 +99,13 @@ describe("providers utils", () => {
       "common.provider.kimi:Kimi CLI"
     );
     expect(getResumeCommand("kimi", "abc-123")).toBe("kimi -r abc-123");
+  });
+
+  it("returns the vibe resume flag for vibe sessions", () => {
+    expect(getProviderLabel((key, fallback) => `${key}:${fallback}`, "vibe")).toBe(
+      "common.provider.vibe:Mistral Vibe"
+    );
+    expect(getResumeCommand("vibe", "abc-123")).toBe("vibe --resume abc-123");
   });
 
   it("returns the Copilot CLI resume flag for copilot sessions with cli entrypoint", () => {

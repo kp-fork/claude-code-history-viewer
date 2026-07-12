@@ -58,6 +58,7 @@ pub async fn scan_all_projects(
             "zed".to_string(),
             "openhands".to_string(),
             "trae".to_string(),
+            "vibe".to_string(),
         ]
     });
 
@@ -134,6 +135,7 @@ pub async fn scan_all_projects(
         ("zed", providers::zed::scan_projects),
         ("openhands", providers::openhands::scan_projects),
         ("trae", providers::trae::scan_projects),
+        ("vibe", providers::vibe::scan_projects),
         ("cline", providers::cline::scan_projects),
         ("cursor", providers::cursor::scan_projects),
         ("crush", providers::crush::scan_projects),
@@ -337,6 +339,7 @@ pub async fn load_provider_sessions(
         "zed" => providers::zed::load_sessions(&project_path, exclude),
         "openhands" => providers::openhands::load_sessions(&project_path, exclude),
         "trae" => providers::trae::load_sessions(&project_path, exclude),
+        "vibe" => providers::vibe::load_sessions(&project_path, exclude),
         _ => Err(format!("Unknown provider: {provider}")),
     }
 }
@@ -384,6 +387,7 @@ pub async fn load_provider_messages(
         "zed" => providers::zed::load_messages(&session_path)?,
         "openhands" => providers::openhands::load_messages(&session_path)?,
         "trae" => providers::trae::load_messages(&session_path)?,
+        "vibe" => providers::vibe::load_messages(&session_path)?,
         _ => return Err(format!("Unknown provider: {provider}")),
     };
 
@@ -437,6 +441,7 @@ pub async fn search_all_providers(
             "zed".to_string(),
             "openhands".to_string(),
             "trae".to_string(),
+            "vibe".to_string(),
         ]
     });
 
@@ -555,6 +560,16 @@ pub async fn search_all_providers(
             Ok(results) => all_results.extend(results),
             Err(e) => {
                 log::warn!("Kimi search failed: {e}");
+            }
+        }
+    }
+
+    // Mistral Vibe
+    if providers_to_search.iter().any(|p| p == "vibe") {
+        match providers::vibe::search(&query, max_results) {
+            Ok(results) => all_results.extend(results),
+            Err(e) => {
+                log::warn!("Vibe search failed: {e}");
             }
         }
     }
