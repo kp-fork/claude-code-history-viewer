@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0] - 2026-07-12
+
+Performance release: a full data-scaling pass for large histories — paginated message loading, cached analytics, and self-validating search caches — plus session multi-select with mass delete.
+
+### Added
+- **Session multi-select with mass delete** — Finder-style selection (Shift range, Cmd/Ctrl toggle) with a selection bar for copying session IDs and deleting in bulk; providers that don't support deletion are skipped with a notice. (#456)
+- **"Load & select all" for paginated session lists** — select-all now shows exactly how many loaded sessions it covers, warns when more sessions exist on disk than are loaded, and can page in the rest before selecting. (#459)
+- **Vibe image attachments** render in session transcripts.
+- **Codex zstd-compressed rollouts** (`.jsonl.zst`) are discovered and parsed.
+
+### Performance
+- **Messages load in pages** — opening a session fetches the newest ~200 messages instead of the whole transcript (a 47k-message session no longer stalls the app). Scrolling up loads earlier pages with a stable viewport; deep links and search jumps extend the window automatically; export and in-session search still cover the complete conversation. (#458)
+- **Project session lists load in pages** with an explicit "load more" control. (#381)
+- **Analytics statistics are cached per file** — the global/project dashboards re-parse only files that actually changed instead of the entire corpus on every open and date-filter change, with byte-identical results. (#464)
+- **Search results stay cached while sessions are being written** — the search cache validates each file's size/mtime at serve time instead of evicting everything on any file change; filter and limit changes reuse cached matches with zero re-scans. (#467)
+- **Global-search result clicks resolve directly** — the clicked result's project is tried first (one request in the common case) and any fallback sweep runs in parallel batches with cancellation, replacing the serial all-projects scan. (#466)
+- **The project sidebar stays responsive with large project counts** — search filtering is deferred off the keystroke path and collapsed rows skip offscreen rendering. (#460)
+- **Huge tool outputs no longer freeze the viewer** — syntax highlighting is skipped above 50k characters and very large text/JSON blocks render a preview with an explicit "show all". (#461)
+- **VS Code-family workspace scans run in parallel** (Cursor, VS Code, Trae, Cline, Crush) on a bounded pool, so locked workspace databases no longer stack 5-second waits serially at startup. (#468)
+
+### Fixed
+- **WebUI `--serve` mode**: `detect_claude_config_dir` was missing from the server router — `CLAUDE_CONFIG_DIR` auto-detection silently failed and every session logged a 405 console error. (#465)
+- The multi-select session checkbox is keyboard-operable (a11y).
+- Codex rollouts without a `session_meta` are identified via `turn_context` cwd and filename id.
+
 ## [1.20.0] - 2026-07-12
 
 Feature release: Mistral Vibe provider support (now 28 supported assistants) plus analytics and live-refresh fixes.
