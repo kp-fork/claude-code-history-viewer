@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-07-12
+
+Feature release: Mistral Vibe provider support (now 28 supported assistants) plus analytics and live-refresh fixes.
+
+### Added
+- **Mistral Vibe provider support** — sessions from `~/.vibe/logs/session/` (`meta.json` + `messages.jsonl`, OpenAI-style transcripts with reasoning and tool calls), honoring `$VIBE_HOME`. Implementation verified against the upstream `mistralai/mistral-vibe` source during review. (#438, closes #427)
+
+### Changed
+- **Analytics model pricing updated** for the latest Anthropic (Fable 5, Opus 4.8, Sonnet 5) and OpenAI (GPT-5.6 family) models; OpenAI entries keep zero cache-write cost per provider billing. (#457)
+- Translated READMEs list all 28 providers (they were missing the Pi/oh-my-pi rows added in 1.19.0).
+
+### Fixed
+- **Pi and oh-my-pi sessions live-refresh again** — file-change events under `~/.pi/agent/sessions` and `~/.omp/agent/sessions` were watched but never mapped to a project/session, so the UI ignored them.
+
 ## [1.19.0] - 2026-07-12
 
 Feature release: two new providers (now 27 supported assistants), Claude Code Workflow rendering, and a cross-provider parallel-task filter.
